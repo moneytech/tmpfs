@@ -15,6 +15,9 @@ typedef struct {
 
 static tmpfs_file_t root_dir;
 
+/**
+ * Initializes a file struct with the given path as name and give stat.
+ */
 static void init_file(tmpfs_file_t * file, const char * path, const struct stat * stat)
 {
     file->name = path;
@@ -22,7 +25,12 @@ static void init_file(tmpfs_file_t * file, const char * path, const struct stat 
     file->data = NULL;
 }
 
-static int tmpfs_lookup(const char * path, tmpfs_file_t ** file)
+/**
+ * Performs a lookup for the file struct corresponding to the given file.
+ * Stores the result in the out parameter `file`.
+ * Returns -ENOMEM or -ENOENT if some error occured, or 0 if successful.
+ */
+static int lookup(const char * path, tmpfs_file_t ** file)
 {
     tmpfs_file_t * dir = &root_dir;
     int result = 0;
@@ -35,13 +43,14 @@ static int tmpfs_lookup(const char * path, tmpfs_file_t ** file)
         goto cleanup;
     }
 
+    // Ensure the path starts with /
     if (*path != '/')
     {
-        // There was something before the initial /
         result = -ENOENT;
         goto cleanup; 
     }
 
+    // Start iterating of the path entries and searching in the directories.
     entry = strtok_r(path_copy, "/", &save_ptr);
     while (NULL != entry)
     {
@@ -55,8 +64,6 @@ static int tmpfs_lookup(const char * path, tmpfs_file_t ** file)
             result = -ENOENT;
             goto cleanup;
         }
-
-        printf("dir name %s, dir_len %zu\n", dir->name, dir_len);
 
         while (dir_entry < ((tmpfs_file_t *)dir->data) + dir_len)
         {
@@ -86,9 +93,11 @@ cleanup:
     return result;
 }
 
+/**
+ * Initializes the file struct for the root directory.
+ */
 static void * tmpfs_init(struct fuse_conn_info *conn)
 {
-    printf("init called\n");
     struct stat stat = {0};
     stat.st_uid = 1000;
     stat.st_gid = 1000;
@@ -104,10 +113,9 @@ static void * tmpfs_init(struct fuse_conn_info *conn)
 
 static int tmpfs_getattr(const char * path, struct stat * statbuf)
 {
-    printf("getattr called\n");
     tmpfs_file_t * file;
 
-    int result = tmpfs_lookup(path, &file);
+    int result = lookup(path, &file);
 
     if (0 == result)
     {
@@ -121,7 +129,7 @@ static int tmpfs_readdir(const char * path, void * buf, fuse_fill_dir_t filler, 
 {
     tmpfs_file_t * dir;
 
-    int result = tmpfs_lookup(path, &dir);
+    int result = lookup(path, &dir);
     if (0 != result)
     {
         return result;
@@ -161,6 +169,7 @@ static int tmpfs_create(const char * path, mode_t mode, struct fuse_file_info * 
         goto cleanup;
     }
 
+    // TODO verify that the file doesn't exist in the directory
     filename = basename(path_copy);
     filename = strdup(filename);
     if (NULL == filename)
@@ -188,12 +197,9 @@ static int tmpfs_create(const char * path, mode_t mode, struct fuse_file_info * 
     dir->data = dir_data;
     dir->stat.st_size += sizeof(tmpfs_file_t);
 
-    printf("dir data %p, dir size %zu\n", dir->data, dir->stat.st_size);
-    printf("file name %s\n", file->name);
-     
 cleanup:
     free(path_copy);
-    if (file->name != filename)
+    if (NULL != file && file->name != filename)
     {
         free(filename);
     }
@@ -209,7 +215,7 @@ static int tmpfs_read(const char * path, char * buf, size_t size, off_t offset, 
 {
     tmpfs_file_t * file;
 
-    int result = tmpfs_lookup(path, &file);
+    int result = lookup(path, &file);
     if (0 != result)
     {
         return result;
@@ -220,6 +226,7 @@ static int tmpfs_read(const char * path, char * buf, size_t size, off_t offset, 
         return -EISDIR;
     }
 
+    // If more bytes are requested then exist in the file, return as much as possible until the end of the file.
     if (file->stat.st_size - offset < size)
     {
         size = file->stat.st_size - offset;
