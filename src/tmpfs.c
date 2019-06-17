@@ -119,11 +119,16 @@ static int tmpfs_getattr(const char * path, struct stat * statbuf)
 
 static int tmpfs_readdir(const char * path, void * buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info * fi)
 {
-    printf("readdir called\n");
-    tmpfs_file_t * dir = &root_dir;
+    tmpfs_file_t * dir;
+
+    int result = tmpfs_lookup(path, &dir);
+    if (0 != result)
+    {
+        return result;
+    }
+
     tmpfs_file_t * dir_data = dir->data;
     size_t dir_len = dir->stat.st_size / sizeof(tmpfs_file_t);
-    printf("dir_len %zu\n", dir_len);
 
     for (int i = 0; i < dir_len; i++)
     {
@@ -138,13 +143,13 @@ static int tmpfs_readdir(const char * path, void * buf, fuse_fill_dir_t filler, 
 
 static int tmpfs_create(const char * path, mode_t mode, struct fuse_file_info * fi)
 {
-    printf("create called\n");
     char * path_copy = NULL;
     char * filename = NULL;
     int result;
     tmpfs_file_t * file = NULL;
     struct stat stat = {0};
 
+    // TODO lookup dirname
     tmpfs_file_t * dir = &root_dir;
     tmpfs_file_t * dir_data = (tmpfs_file_t *)dir->data;
     size_t dir_size = dir->stat.st_size;
