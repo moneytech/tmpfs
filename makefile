@@ -1,6 +1,6 @@
-TMPFS_SRC_FILES := src/tmpfs.c
+TMPFS_SRC_FILES := src/*.c
 OUTPUT_DIR := output
-CFLAGS := $(shell pkg-config fuse --cflags --libs) -ggdb
+CFLAGS := $(shell pkg-config fuse --cflags --libs) -ggdb -Iinc
 
 MOUNTPOINT := /tmp/mnt
 

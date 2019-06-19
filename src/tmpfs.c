@@ -6,98 +6,13 @@
 #include <errno.h>
 #include <libgen.h>
 #include <stdio.h>
-
-typedef struct {
-    const char * name;
-    struct stat stat;
-    void * data;
-} tmpfs_file_t;
+#include "utils.h"
 
 static tmpfs_file_t root_dir;
 
-/**
- * Initializes a file struct with the given path as name and give stat.
- */
-static void init_file(tmpfs_file_t * file, const char * path, const struct stat * stat)
-{
-    file->name = path;
-    memcpy(&(file->stat), stat, sizeof(*stat));
-    file->data = NULL;
-}
-
-/**
- * Performs a lookup for the file struct corresponding to the given file.
- * Stores the result in the out parameter `file`.
- * Returns -ENOMEM or -ENOENT if some error occured, or 0 if successful.
- */
-static int lookup(const char * path, tmpfs_file_t ** file)
-{
-    tmpfs_file_t * dir = &root_dir;
-    int result = 0;
-    char * entry = NULL;
-    char * save_ptr = NULL;
-    char * path_copy = strdup(path);
-    if (NULL == path_copy)
-    {
-        result = -ENOMEM;
-        goto cleanup;
-    }
-
-    // Ensure the path starts with /
-    if (*path != '/')
-    {
-        result = -ENOENT;
-        goto cleanup; 
-    }
-
-    // Start iterating of the path entries and searching in the directories.
-    entry = strtok_r(path_copy, "/", &save_ptr);
-    while (NULL != entry)
-    {
-        tmpfs_file_t * dir_entry = dir->data;
-        size_t dir_len = dir->stat.st_size / sizeof(tmpfs_file_t);
-        int found = 0;
-
-        // Verify that it's a directory.
-        if (!(dir->stat.st_mode & S_IFDIR))
-        {
-            result = -ENOENT;
-            goto cleanup;
-        }
-
-        while (dir_entry < ((tmpfs_file_t *)dir->data) + dir_len)
-        {
-            // Check file name.
-            if (0 == strcmp(dir_entry->name, entry))
-            {
-                dir = dir_entry;
-                found = 1;
-                break;
-            }
-            dir_entry++;
-        }
-
-        if (!found)
-        {
-            result = -ENOENT;
-            goto cleanup;
-        }
-
-        entry = strtok_r(NULL, "/", &save_ptr);
-    }
-
-    *file = dir;
-    
-cleanup:
-    free(path_copy);
-    return result;
-}
-
-/**
- * Initializes the file struct for the root directory.
- */
 static void * tmpfs_init(struct fuse_conn_info *conn)
 {
+    // Initializes the file struct for the root directory.
     struct stat stat = {0};
     stat.st_uid = 1000;
     stat.st_gid = 1000;
@@ -110,12 +25,11 @@ static void * tmpfs_init(struct fuse_conn_info *conn)
     return NULL;
 }
 
-
 static int tmpfs_getattr(const char * path, struct stat * statbuf)
 {
     tmpfs_file_t * file;
 
-    int result = lookup(path, &file);
+    int result = lookup(path, &root_dir, &file);
 
     if (0 == result)
     {
@@ -129,7 +43,7 @@ static int tmpfs_readdir(const char * path, void * buf, fuse_fill_dir_t filler, 
 {
     tmpfs_file_t * dir;
 
-    int result = lookup(path, &dir);
+    int result = lookup(path, &root_dir, &dir);
     if (0 != result)
     {
         return result;
@@ -169,6 +83,7 @@ static int tmpfs_create(const char * path, mode_t mode, struct fuse_file_info * 
         goto cleanup;
     }
 
+    // TODO move this to another function
     // TODO verify that the file doesn't exist in the directory
     filename = basename(path_copy);
     filename = strdup(filename);
@@ -215,7 +130,7 @@ static int tmpfs_read(const char * path, char * buf, size_t size, off_t offset, 
 {
     tmpfs_file_t * file;
 
-    int result = lookup(path, &file);
+    int result = lookup(path, &root_dir, &file);
     if (0 != result)
     {
         return result;
@@ -239,7 +154,13 @@ static int tmpfs_read(const char * path, char * buf, size_t size, off_t offset, 
 
 static int tmpfs_utimens(const char * path, const struct timespec tv[2])
 {
-    tmpfs_file_t * file = &root_dir;
+    tmpfs_file_t * file;
+
+    int result = lookup(path, &root_dir, &file);
+    if (0 != result)
+    {
+        return result;
+    }
 
     memcpy(&(file->stat.st_atim), tv, sizeof(*tv));
     memcpy(&(file->stat.st_mtim), tv + 1, sizeof(*tv));
