@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include "utils.h"
 
-static tmpfs_file_t root_dir;
+static tmpfs_inode_t root_dir;
 
 static void * tmpfs_init(struct fuse_conn_info *conn)
 {
@@ -27,7 +27,7 @@ static void * tmpfs_init(struct fuse_conn_info *conn)
 
 static int tmpfs_getattr(const char * path, struct stat * statbuf)
 {
-    tmpfs_file_t * file;
+    tmpfs_inode_t * file;
 
     int result = lookup(path, &root_dir, &file);
 
@@ -41,7 +41,7 @@ static int tmpfs_getattr(const char * path, struct stat * statbuf)
 
 static int tmpfs_readdir(const char * path, void * buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info * fi)
 {
-    tmpfs_file_t * dir;
+    tmpfs_inode_t * dir;
 
     int result = lookup(path, &root_dir, &dir);
     if (0 != result)
@@ -49,8 +49,8 @@ static int tmpfs_readdir(const char * path, void * buf, fuse_fill_dir_t filler, 
         return result;
     }
 
-    tmpfs_file_t * dir_data = dir->data;
-    size_t dir_len = dir->stat.st_size / sizeof(tmpfs_file_t);
+    tmpfs_inode_t * dir_data = dir->data;
+    size_t dir_len = dir->stat.st_size / sizeof(tmpfs_inode_t);
 
     for (int i = 0; i < dir_len; i++)
     {
@@ -68,12 +68,12 @@ static int tmpfs_create(const char * path, mode_t mode, struct fuse_file_info * 
     char * path_copy = NULL;
     char * filename = NULL;
     int result;
-    tmpfs_file_t * file = NULL;
+    tmpfs_inode_t * file = NULL;
     struct stat stat = {0};
 
     // TODO lookup dirname
-    tmpfs_file_t * dir = &root_dir;
-    tmpfs_file_t * dir_data = (tmpfs_file_t *)dir->data;
+    tmpfs_inode_t * dir = &root_dir;
+    tmpfs_inode_t * dir_data = (tmpfs_inode_t *)dir->data;
     size_t dir_size = dir->stat.st_size;
     
     path_copy = strdup(path);
@@ -93,13 +93,13 @@ static int tmpfs_create(const char * path, mode_t mode, struct fuse_file_info * 
         goto cleanup;
     }
 
-    dir_data = realloc(dir_data, dir_size + sizeof(tmpfs_file_t));
+    dir_data = realloc(dir_data, dir_size + sizeof(tmpfs_inode_t));
     if (NULL == dir_data)
     {
         result = -ENOMEM;
         goto cleanup;
     }
-    file = (tmpfs_file_t * )((char *)dir_data + dir_size);
+    file = (tmpfs_inode_t * )((char *)dir_data + dir_size);
 
     stat.st_uid = 1000;
     stat.st_gid = 1000;
@@ -110,7 +110,7 @@ static int tmpfs_create(const char * path, mode_t mode, struct fuse_file_info * 
     init_file(file, filename, &stat);
 
     dir->data = dir_data;
-    dir->stat.st_size += sizeof(tmpfs_file_t);
+    dir->stat.st_size += sizeof(tmpfs_inode_t);
 
 cleanup:
     free(path_copy);
@@ -128,7 +128,7 @@ static int tmpfs_open(const char * path, struct fuse_file_info *fi)
 
 static int tmpfs_read(const char * path, char * buf, size_t size, off_t offset, struct fuse_file_info * fi)
 {
-    tmpfs_file_t * file;
+    tmpfs_inode_t * file;
 
     int result = lookup(path, &root_dir, &file);
     if (0 != result)
@@ -154,7 +154,7 @@ static int tmpfs_read(const char * path, char * buf, size_t size, off_t offset, 
 
 static int tmpfs_utimens(const char * path, const struct timespec tv[2])
 {
-    tmpfs_file_t * file;
+    tmpfs_inode_t * file;
 
     int result = lookup(path, &root_dir, &file);
     if (0 != result)

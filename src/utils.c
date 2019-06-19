@@ -4,16 +4,16 @@
 #include <sys/stat.h>
 #include "utils.h"
 
-void init_file(tmpfs_file_t * file, const char * path, const struct stat * stat)
+void init_file(tmpfs_inode_t * file, const char * path, const struct stat * stat)
 {
     file->name = path;
     memcpy(&(file->stat), stat, sizeof(*stat));
     file->data = NULL;
 }
 
-int lookup(const char * path, tmpfs_file_t * root_dir, tmpfs_file_t ** file)
+int lookup(const char * path, tmpfs_inode_t * root_dir, tmpfs_inode_t ** file)
 {
-    tmpfs_file_t * dir = root_dir;
+    tmpfs_inode_t * dir = root_dir;
     int result = 0;
     char * entry = NULL;
     char * save_ptr = NULL;
@@ -38,8 +38,8 @@ int lookup(const char * path, tmpfs_file_t * root_dir, tmpfs_file_t ** file)
     while (NULL != entry)
     {
         // TODO move this to another function
-        tmpfs_file_t * dir_entry = dir->data;
-        size_t dir_len = dir->stat.st_size / sizeof(tmpfs_file_t);
+        tmpfs_inode_t * dir_entry = dir->data;
+        size_t dir_len = dir->stat.st_size / sizeof(tmpfs_inode_t);
         int found = 0;
 
         // Verify that it's a directory.
@@ -49,7 +49,7 @@ int lookup(const char * path, tmpfs_file_t * root_dir, tmpfs_file_t ** file)
             goto cleanup;
         }
 
-        while (dir_entry < ((tmpfs_file_t *)dir->data) + dir_len)
+        while (dir_entry < ((tmpfs_inode_t *)dir->data) + dir_len)
         {
             // Check file name.
             if (0 == strcmp(dir_entry->name, entry))
