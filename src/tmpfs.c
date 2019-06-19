@@ -65,58 +65,62 @@ static int tmpfs_readdir(const char * path, void * buf, fuse_fill_dir_t filler, 
 
 static int tmpfs_create(const char * path, mode_t mode, struct fuse_file_info * fi)
 {
-    char * path_copy = NULL;
-    char * filename = NULL;
-    int result;
-    tmpfs_inode_t * file = NULL;
     struct stat stat = {0};
+    tmpfs_inode_t * dir = NULL;
+    tmpfs_inode_t file;
+    char * path_copy_dir = NULL;
+    char * path_copy_file = NULL;
+    char * directoryname = NULL;
+    char * filename = NULL;
+    char * filename_copy = NULL;
+    int result = 0;
 
-    // TODO lookup dirname
-    tmpfs_inode_t * dir = &root_dir;
-    tmpfs_inode_t * dir_data = (tmpfs_inode_t *)dir->data;
-    size_t dir_size = dir->stat.st_size;
+    // Get dirname and filename.
+    path_copy_dir = strdup(path);
+    if (NULL == path_copy_dir)
+    {
+        result = -ENOMEM;
+        goto cleanup;
+    }
+    path_copy_file = strdup(path);
+    if (NULL == path_copy_file)
+    {
+        result = -ENOMEM;
+        goto cleanup;
+    }
+    directoryname = dirname(path_copy_dir);
+    filename = basename(path_copy_file);
+
+    // Lookup dir.
+    result = lookup(directoryname, &root_dir, &dir);
+    if (0 != result)
+    {
+        goto cleanup;
+    }
     
-    path_copy = strdup(path);
-    if (NULL == path_copy)
+    // Init new file.
+    filename_copy = strdup(filename);
+    if (NULL == filename_copy)
     {
         result = -ENOMEM;
         goto cleanup;
     }
-
-    // TODO move this to another function
-    // TODO verify that the file doesn't exist in the directory
-    filename = basename(path_copy);
-    filename = strdup(filename);
-    if (NULL == filename)
-    {
-        result = -ENOMEM;
-        goto cleanup;
-    }
-
-    dir_data = realloc(dir_data, dir_size + sizeof(tmpfs_inode_t));
-    if (NULL == dir_data)
-    {
-        result = -ENOMEM;
-        goto cleanup;
-    }
-    file = (tmpfs_inode_t * )((char *)dir_data + dir_size);
-
     stat.st_uid = 1000;
     stat.st_gid = 1000;
     stat.st_mode = S_IFREG | mode;
     stat.st_nlink = 1;
     stat.st_size = 0;
+    init_file(&file, filename_copy, &stat);
 
-    init_file(file, filename, &stat);
-
-    dir->data = dir_data;
-    dir->stat.st_size += sizeof(tmpfs_inode_t);
+    // Add the file to the directory.
+    result = create_file(dir, &file);
 
 cleanup:
-    free(path_copy);
-    if (NULL != file && file->name != filename)
+    free(path_copy_dir);
+    free(path_copy_file);
+    if (0 != result)
     {
-        free(filename);
+        free(filename_copy);
     }
     return result;
 }

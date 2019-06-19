@@ -17,3 +17,15 @@ void init_file(tmpfs_inode_t * file, const char * path, const struct stat * stat
  * Returns -ENOMEM or -ENOENT if some error occured, or 0 if successful.
  */
 int lookup(const char * path, tmpfs_inode_t * root_dir, tmpfs_inode_t ** file);
+
+/**
+ * Looks for an entry with the given name inside the dir.
+ * Returns the inode if found, else returns NULL.
+ */
+tmpfs_inode_t * dir_lookup(tmpfs_inode_t * dir, const char * name);
+
+/**
+ * Puts the given file in the dir.
+ * Returns 0 iff successful, -ENOMEM or -EEXIST otherwise.
+ */
+int create_file(tmpfs_inode_t * dir, const tmpfs_inode_t * file);
