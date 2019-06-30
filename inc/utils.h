@@ -25,7 +25,7 @@ int lookup(const char * path, tmpfs_inode_t * root_dir, tmpfs_inode_t ** file);
 tmpfs_inode_t * dir_lookup(tmpfs_inode_t * dir, const char * name);
 
 /**
- * Puts the given file in the dir.
+ * Puts the given inode in the dir.
  * Returns 0 iff successful, -ENOMEM or -EEXIST otherwise.
  */
-int create_file(tmpfs_inode_t * dir, const tmpfs_inode_t * file);
+int add_inode_to_dir(tmpfs_inode_t * dir, const tmpfs_inode_t * inode);

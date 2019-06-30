@@ -113,7 +113,7 @@ static int tmpfs_create(const char * path, mode_t mode, struct fuse_file_info * 
     init_file(&file, filename_copy, &stat);
 
     // Add the file to the directory.
-    result = create_file(dir, &file);
+    result = add_inode_to_dir(dir, &file);
 
 cleanup:
     free(path_copy_dir);
@@ -170,6 +170,10 @@ static int tmpfs_utimens(const char * path, const struct timespec tv[2])
     memcpy(&(file->stat.st_mtim), tv + 1, sizeof(*tv));
 
     return 0;
+}
+
+static int tmpfs_mkdir(const char * path, mode_t mode)
+{
 }
 
 static struct fuse_operations tmpfs_operations = {

@@ -4,14 +4,14 @@
 #include <sys/stat.h>
 #include "utils.h"
 
-int create_file(tmpfs_inode_t * dir, const tmpfs_inode_t * file)
+int add_inode_to_dir(tmpfs_inode_t *dir, const tmpfs_inode_t *inode)
 {
     tmpfs_inode_t * dir_data = NULL;
 
     // TODO Ensure it's a dir? Is it even possible for it not to be a directory?
 
     // Validate that the dir doesn't have a file with the same name.
-    if (NULL != dir_lookup(dir, file->name))
+    if (NULL != dir_lookup(dir, inode->name))
     {
         return -EEXIST;
     }
@@ -24,7 +24,7 @@ int create_file(tmpfs_inode_t * dir, const tmpfs_inode_t * file)
     }
 
     // Copy the file into the new space.
-    memcpy((char*)dir_data + dir->stat.st_size, file, sizeof(tmpfs_inode_t));
+    memcpy((char*)dir_data + dir->stat.st_size, inode, sizeof(tmpfs_inode_t));
 
     // Update the dir inode.
     dir->data = dir_data;
