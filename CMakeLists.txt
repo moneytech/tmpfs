@@ -13,8 +13,6 @@ include_directories(PRIVATE ${FUSE_INCLUDE_DIR})
 link_libraries(${FUSE_LIBRARIES})
 add_compile_definitions(_FILE_OFFSET_BITS=64)
 
-#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_FILE_OFFSET_BITS=64 -I/usr/include/fuse -lfuse -pthread -ggdb")
-
 
 add_executable(tmpfs
         inc/utils.h

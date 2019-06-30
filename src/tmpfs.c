@@ -4,7 +4,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <libgen.h>
 #include <stdio.h>
 #include "utils.h"
 
@@ -20,6 +19,7 @@ static void * tmpfs_init(struct fuse_conn_info *conn)
     stat.st_nlink = 2;
     stat.st_size = 0;
 
+    // TODO check return value.
     init_file(&root_dir, "/", &stat);
 
     return NULL;
@@ -68,61 +68,26 @@ static int tmpfs_create(const char * path, mode_t mode, struct fuse_file_info * 
     struct stat stat = {0};
     tmpfs_inode_t * dir = NULL;
     tmpfs_inode_t file;
-    char * path_copy_dir = NULL;
-    char * path_copy_file = NULL;
-    char * directoryname = NULL;
-    char * filename = NULL;
-    char * filename_copy = NULL;
+    char * filename;
     int result = 0;
 
-    // Get dirname and filename.
-    path_copy_dir = strdup(path);
-    if (NULL == path_copy_dir)
-    {
-        result = -ENOMEM;
-        goto cleanup;
-    }
-    path_copy_file = strdup(path);
-    if (NULL == path_copy_file)
-    {
-        result = -ENOMEM;
-        goto cleanup;
-    }
-    directoryname = dirname(path_copy_dir);
-    filename = basename(path_copy_file);
-
-    // Lookup dir.
-    result = lookup(directoryname, &root_dir, &dir);
+    // Get dir and filename.
+    result = split(path, &root_dir, &dir, &filename);
     if (0 != result)
     {
-        goto cleanup;
+        return result;
     }
-    
+
     // Init new file.
-    filename_copy = strdup(filename);
-    if (NULL == filename_copy)
-    {
-        result = -ENOMEM;
-        goto cleanup;
-    }
     stat.st_uid = 1000;
     stat.st_gid = 1000;
     stat.st_mode = S_IFREG | mode;
     stat.st_nlink = 1;
     stat.st_size = 0;
-    init_file(&file, filename_copy, &stat);
+    init_file(&file, filename, &stat);
 
     // Add the file to the directory.
-    result = add_inode_to_dir(dir, &file);
-
-cleanup:
-    free(path_copy_dir);
-    free(path_copy_file);
-    if (0 != result)
-    {
-        free(filename_copy);
-    }
-    return result;
+    return add_inode_to_dir(dir, &file);
 }
 
 static int tmpfs_open(const char * path, struct fuse_file_info *fi)
@@ -173,7 +138,29 @@ static int tmpfs_utimens(const char * path, const struct timespec tv[2])
 }
 
 static int tmpfs_mkdir(const char * path, mode_t mode)
-{
+{    struct stat stat = {0};
+    tmpfs_inode_t * dir = NULL;
+    tmpfs_inode_t file;
+    char * filename;
+    int result = 0;
+
+    // Get dir and filename.
+    result = split(path, &root_dir, &dir, &filename);
+    if (0 != result)
+    {
+        return result;
+    }
+
+    // Init new file.
+    stat.st_uid = 1000;
+    stat.st_gid = 1000;
+    stat.st_mode = S_IFDIR | mode;
+    stat.st_nlink = 1;
+    stat.st_size = 0;
+    init_file(&file, filename, &stat);
+
+    // Add the file to the directory.
+    return add_inode_to_dir(dir, &file);
 }
 
 static struct fuse_operations tmpfs_operations = {
@@ -184,6 +171,7 @@ static struct fuse_operations tmpfs_operations = {
     .create = tmpfs_create,
     .utimens = tmpfs_utimens,
     .read = tmpfs_read,
+    .mkdir = tmpfs_mkdir,
 };
 
 int main(int argc, char* argv[])

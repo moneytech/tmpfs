@@ -1,8 +1,19 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <libgen.h>
 #include <sys/stat.h>
 #include "utils.h"
+
+/**
+ * A safe basename implementation that doesn't modify the path. Taken from Glibc.
+ * @return the filenmae.
+ */
+static const char * safe_basename(const char * path)
+{
+    char * p = strrchr (path, '/');
+    return p ? p + 1 : (char *) path;
+}
 
 int add_inode_to_dir(tmpfs_inode_t *dir, const tmpfs_inode_t *inode)
 {
@@ -56,11 +67,16 @@ tmpfs_inode_t * dir_lookup(tmpfs_inode_t * dir, const char * name)
     return NULL;
 }
 
-void init_file(tmpfs_inode_t * file, const char * path, const struct stat * stat)
+int init_file(tmpfs_inode_t *file, const char *name, const struct stat *stat)
 {
-    file->name = path;
+    file->name = strdup(name);
+    if (NULL == file->name)
+    {
+        return -ENOMEM;
+    }
     memcpy(&(file->stat), stat, sizeof(*stat));
     file->data = NULL;
+    return 0;
 }
 
 int lookup(const char * path, tmpfs_inode_t * root_dir, tmpfs_inode_t ** file)
@@ -103,6 +119,38 @@ int lookup(const char * path, tmpfs_inode_t * root_dir, tmpfs_inode_t ** file)
 
     *file = dir;
     
+cleanup:
+    free(path_copy);
+    return result;
+}
+
+int split(const char * path, const tmpfs_inode_t * root_dir, tmpfs_inode_t ** dir, char ** filename)
+{
+    char * path_copy= NULL;
+    char * directory_name = NULL;
+    int result = 0;
+
+    // Get the directory name.
+    path_copy = strdup(path);
+    if (NULL == path_copy)
+    {
+        result = -ENOMEM;
+        goto cleanup;
+    }
+    directory_name = dirname(path_copy);
+
+    // Get the directory inode.
+    result = lookup(directory_name, root_dir, dir);
+    if (0 != result)
+    {
+        goto cleanup;
+    }
+
+    // Get the file name.
+    *filename = safe_basename(path);
+
+    result = 0;
+
 cleanup:
     free(path_copy);
     return result;

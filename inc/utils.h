@@ -7,9 +7,11 @@ typedef struct {
 } tmpfs_inode_t;
 
 /**
- * Initializes a file struct with the given path as name and give stat.
+ * Initializes a file struct with the given name and stat.
+ * @return 0 iff successful, -ENOMEM otherwise.
+ * @note name is copied to a buffer owned by the inode.
  */
-void init_file(tmpfs_inode_t * file, const char * path, const struct stat * stat);
+int init_file(tmpfs_inode_t *file, const char *name, const struct stat *stat);
 
 /**
  * Performs a lookup for the file struct corresponding to the given path, starting from the given root dir.
@@ -29,3 +31,10 @@ tmpfs_inode_t * dir_lookup(tmpfs_inode_t * dir, const char * name);
  * Returns 0 iff successful, -ENOMEM or -EEXIST otherwise.
  */
 int add_inode_to_dir(tmpfs_inode_t * dir, const tmpfs_inode_t * inode);
+
+/**
+ * Splits the given path into the dirname and filename.
+ * @return 0 iff successful, -ENOMEM otherwise.
+ * @note filename must NOT be freed, it's a pointer inside the given path.
+ */
+int split(const char *path, const tmpfs_inode_t * root_dir, tmpfs_inode_t ** dirname, char **filename);
