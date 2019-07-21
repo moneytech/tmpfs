@@ -121,6 +121,41 @@ static int tmpfs_read(const char * path, char * buf, size_t size, off_t offset, 
     return size;
 }
 
+static int tmpfs_write(const char * path, const char * buf, size_t size, off_t offset, struct fuse_file_info * fi)
+{
+    tmpfs_inode_t * file;
+
+    int result = lookup(path, &root_dir, &file);
+    if (0 != result)
+    {
+        return result;
+    }
+
+    if (file->stat.st_mode & S_IFDIR)
+    {
+        return -EISDIR;
+    }
+
+    // If writing beyond EOF, allocate more memory
+    if (offset + size > file->stat.st_size)
+    {
+        size_t newsize = offset + size;
+        char * file_data = realloc(file->data, newsize);
+        if (NULL == file_data)
+        {
+            return -ENOMEM;
+        }
+
+        file->data = file_data;
+        file->stat.st_size = newsize;
+    }
+
+    memcpy(file->data + offset, buf, size);
+
+    return size;
+}
+
+
 static int tmpfs_utimens(const char * path, const struct timespec tv[2])
 {
     tmpfs_inode_t * file;
@@ -138,7 +173,8 @@ static int tmpfs_utimens(const char * path, const struct timespec tv[2])
 }
 
 static int tmpfs_mkdir(const char * path, mode_t mode)
-{    struct stat stat = {0};
+{
+    struct stat stat = {0};
     tmpfs_inode_t * dir = NULL;
     tmpfs_inode_t file;
     char * filename;
@@ -172,6 +208,7 @@ static struct fuse_operations tmpfs_operations = {
     .utimens = tmpfs_utimens,
     .read = tmpfs_read,
     .mkdir = tmpfs_mkdir,
+    .write = tmpfs_write,
 };
 
 int main(int argc, char* argv[])
